@@ -50,10 +50,13 @@ func main() {
 }
 
 func runDelayQueue(topicPartition []delayqueue.TopicPartition) {
-	c := delayqueue.NewKafkaDelayQueueConfig()
+	c, err := delayqueue.LoadConfig()
+	if err != nil {
+		panic(err)
+	}
 	c.DelayQueue.TopicPartition = topicPartition
 
-	queue, err := delayqueue.NewKafkaDelayQueue(c)
+	queue, err := delayqueue.New(c)
 	if err != nil {
 		panic(err)
 	}

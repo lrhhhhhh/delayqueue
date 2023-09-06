@@ -1,11 +1,10 @@
 .PHONY:
 
 up:
-	@cd ./kafka && docker-compose up -d
+	@cd ./deployments && docker-compose up -d
 
 down:
-	@cd ./kafka && docker-compose down
-
+	@cd ./deployments && docker-compose down
 
 clean:
-	@cd ./kafka && sudo rm -rf ./kafka/* && sudo rm -rf ./zookeeper/*
+	@cd ./deployments && sudo rm -rf ./kafka/* && sudo rm -rf ./zookeeper/*

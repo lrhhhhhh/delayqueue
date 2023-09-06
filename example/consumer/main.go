@@ -88,8 +88,8 @@ func main() {
 }
 
 func consume(topicPartition []delayqueue.TopicPartition, gid int, resultChan chan<- int) {
-	c := delayqueue.NewKafkaDelayQueueConfig()
-	consumerCfg := delayqueue.NewKafkaConsumerConfig(c)
+	c := delayqueue.NewConfig()
+	consumerCfg := .NewKafkaConsumerConfig(c)
 	fmt.Println(consumerCfg)
 
 	GroupId := "real-consumer"

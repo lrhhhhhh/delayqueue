@@ -5,28 +5,32 @@ import (
 	"errors"
 	"fmt"
 	"github.com/confluentinc/confluent-kafka-go/kafka"
+	"kafkadelayqueue/consumer"
+	"kafkadelayqueue/job"
+	"kafkadelayqueue/producer"
 	"strconv"
 	"sync"
 	"time"
 )
 
-type kafkaDelayQueue struct {
-	producer             *kafkaProducer
-	consumer             *kafkaConsumer
+type DelayQueue struct {
+	producer             *producer.Producer
+	consumer             *consumer.Consumer
 	batchCommitSize      int
 	batchCommitDuration  int
-	locker               *sync.Mutex // guardian for pausePartition
+	locker               *sync.Mutex // guardian for pauseTopicPartition
 	pausedTopicPartition map[kafka.TopicPartition]struct{}
 }
 
-func NewKafkaDelayQueue(c *KafkaDelayQueueConfig) (*kafkaDelayQueue, error) {
-	producer, err := NewKafkaProducer(c)
+func New(c *Config) (*DelayQueue, error) {
+	// DelayQueueProducer -> dqp
+	dqp, err := producer.New(&c.ProducerConfig)
 	if err != nil {
 		return nil, fmt.Errorf("NewKafkaProducer error: %w", err)
 	}
 
-	consumerCfg := NewKafkaConsumerConfig(c)
-	consumer, err := NewKafkaConsumer(consumerCfg)
+	// DelayQueueConsumer -> dqc
+	dqc, err := consumer.New(&c.ConsumerConfig)
 	if err != nil {
 		return nil, fmt.Errorf("NewKafkaConsumer error: %w", err)
 	}
@@ -42,16 +46,16 @@ func NewKafkaDelayQueue(c *KafkaDelayQueueConfig) (*kafkaDelayQueue, error) {
 		}
 	}
 
-	err = consumer.Assign(topicPartition)
+	err = dqc.Assign(topicPartition)
 	if err != nil {
 		return nil, fmt.Errorf("consumer assign %+v fail: %w", topicPartition, err)
 	}
 
-	producer.Run(c.DelayQueue.Debug)
+	dqp.Run(c.DelayQueue.Debug)
 
-	return &kafkaDelayQueue{
-		producer:             producer,
-		consumer:             consumer,
+	return &DelayQueue{
+		producer:             dqp,
+		consumer:             dqc,
 		batchCommitSize:      c.DelayQueue.BatchCommitSize,
 		batchCommitDuration:  c.DelayQueue.BatchCommitDuration,
 		locker:               new(sync.Mutex),
@@ -60,7 +64,7 @@ func NewKafkaDelayQueue(c *KafkaDelayQueueConfig) (*kafkaDelayQueue, error) {
 }
 
 // Run 监听延迟队列，到期投递到真正的队列，未到期则暂停消费延迟队列，ticker到期后恢复消费
-func (k *kafkaDelayQueue) Run(debug bool) {
+func (k *DelayQueue) Run(debug bool) {
 	cnt := 0
 	commitSignal := make(chan struct{})
 
@@ -105,31 +109,31 @@ func (k *kafkaDelayQueue) Run(debug bool) {
 			continue
 		}
 
-		var job Job
-		err = json.Unmarshal(msg.Value, &job)
+		var j job.Job
+		err = json.Unmarshal(msg.Value, &j)
 		if err != nil {
 			fmt.Printf("unmarshal Err:%v, msg(%v)\n", err, msg)
 			continue
 		}
-		if job.Topic == "" {
-			fmt.Printf("empty topic: job(%+v)\n", job)
+		if j.Topic == "" {
+			fmt.Printf("empty topic: job(%+v)\n", j)
 			continue
 		}
 
 		if msg.Timestamp.After(time.Now()) {
 			if err = k.pause(msg.TopicPartition); err != nil {
-				fmt.Printf("Consumer PauseAndSeekTopicPartition Err:%v, jobId(%s), topicPartition(%+v)\n", err, job.Id, msg.TopicPartition)
+				fmt.Printf("Consumer PauseAndSeekTopicPartition Err:%v, jobId(%d), topicPartition(%+v)\n", err, j.Id, msg.TopicPartition)
 			}
 			if debug {
 				fmt.Printf(
 					"job not ready: %+v, exec_time: %v, time_diff: %v > 0 ?\n",
-					job, time.Unix(job.ExecTime, 0), job.ExecTime-time.Now().Unix(),
+					j, time.Unix(j.ExecTime, 0), j.ExecTime-time.Now().Unix(),
 				)
 			}
 		} else {
-			err = k.producer.Send(job.Topic, time.Now(), []byte(strconv.Itoa(job.Id)), msg.Value)
+			err = k.producer.Send(j.Topic, time.Now(), []byte(strconv.Itoa(j.Id)), msg.Value)
 			if err != nil {
-				fmt.Printf("job投递ready队列失败(%v), job(%+v)\n", err, job) // TODO:
+				fmt.Printf("job投递ready队列失败(%v), job(%+v)\n", err, j) // TODO:
 			} else {
 				cnt += 1
 				if cnt >= k.batchCommitSize {
@@ -141,7 +145,7 @@ func (k *kafkaDelayQueue) Run(debug bool) {
 			if debug {
 				fmt.Printf(
 					"job has ready: %+v, exec_time: %v, time_diff: %v <= 0?\n",
-					job, time.Unix(job.ExecTime, 0), job.ExecTime-time.Now().Unix(),
+					j, time.Unix(j.ExecTime, 0), j.ExecTime-time.Now().Unix(),
 				)
 			}
 		}
@@ -149,7 +153,7 @@ func (k *kafkaDelayQueue) Run(debug bool) {
 }
 
 // pause 暂停消费并重置offset
-func (k *kafkaDelayQueue) pause(tp kafka.TopicPartition) error {
+func (k *DelayQueue) pause(tp kafka.TopicPartition) error {
 	err := k.consumer.Pause([]kafka.TopicPartition{tp})
 	if err != nil {
 		return err
@@ -162,7 +166,7 @@ func (k *kafkaDelayQueue) pause(tp kafka.TopicPartition) error {
 	return k.consumer.Seek(tp, 50)
 }
 
-func (k *kafkaDelayQueue) Close() {
+func (k *DelayQueue) Close() {
 	k.producer.Close()
 	_ = k.consumer.Close()
 }

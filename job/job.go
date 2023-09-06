@@ -1,4 +1,4 @@
-package delayqueue
+package job
 
 import (
 	"errors"

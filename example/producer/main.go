@@ -3,12 +3,16 @@ package main
 import (
 	"fmt"
 	"kafkadelayqueue/delayqueue"
+	"kafkadelayqueue/producer"
 	"time"
 )
 
 func main() {
-	c := delayqueue.NewKafkaDelayQueueConfig()
-	queue, err := delayqueue.NewKafkaProducer(c)
+	c, err := delayqueue.LoadConfig()
+	if err != nil {
+		panic(err)
+	}
+	queue, err := producer.New(&c.ProducerConfig)
 	if err != nil {
 		panic(err)
 	}

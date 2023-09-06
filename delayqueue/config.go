@@ -1,9 +1,10 @@
 package delayqueue
 
 import (
-	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"gopkg.in/yaml.v3"
 	"io/ioutil"
+	"kafkadelayqueue/consumer"
+	"kafkadelayqueue/producer"
 )
 
 // TopicPartition represent a topic from partition l to r
@@ -13,39 +14,20 @@ type TopicPartition struct {
 	R     int    `yaml:"r"`
 }
 
-type KafkaDelayQueueConfig struct {
-	KafkaCommon struct {
-		ApiVersionRequest bool   `yaml:"api.version.request"`
-		BootstrapServers  string `yaml:"bootstrap.servers"`
-		SecurityProtocol  string `yaml:"security.protocol"`
-		SslCaLocation     string `yaml:"ssl.ca.location"`
-		SaslMechanism     string `yaml:"sasl.mechanism"`
-		SaslUsername      string `yaml:"sasl.username"`
-		SaslPassword      string `yaml:"sasl.password"`
-	} `yaml:"KafkaCommon"`
+type Common struct {
+	ApiVersionRequest bool   `yaml:"api.version.request"`
+	BootstrapServers  string `yaml:"bootstrap.servers"`
+	SecurityProtocol  string `yaml:"security.protocol"`
+	SslCaLocation     string `yaml:"ssl.ca.location"`
+	SaslMechanism     string `yaml:"sasl.mechanism"`
+	SaslUsername      string `yaml:"sasl.username"`
+	SaslPassword      string `yaml:"sasl.password"`
+}
 
-	KafkaProducer struct {
-		Acks                       string `yaml:"acks"`
-		BatchSize                  int    `yaml:"batch.size"`
-		CompressionType            string `yaml:"compression.type"`
-		DeliveryTimeoutMs          string `yaml:"delivery.timeout.ms"`
-		LingerMs                   string `yaml:"linger.ms"`
-		MessageMaxBytes            string `yaml:"message.max.bytes"`
-		Retries                    string `yaml:"retries"`
-		RetryBackoffMs             string `yaml:"retry.backoff.ms"`
-		StickyPartitioningLingerMs string `yaml:"sticky.partitioning.linger.ms"`
-	} `yaml:"KafkaProducer"`
-
-	KafkaConsumer struct {
-		AutoOffsetReset        string `yaml:"auto.offset.reset"`
-		EnableAutoCommit       string `yaml:"enable.auto.commit"`
-		FetchMaxBytes          string `yaml:"fetch.max.bytes"`
-		GroupId                string `yaml:"group.id"`
-		HeartbeatIntervalMs    string `yaml:"heartbeat.interval.ms"`
-		MaxPollIntervalMs      string `yaml:"max.poll.interval.ms"`
-		MaxPartitionFetchBytes string `yaml:"max.partition.fetch.bytes"`
-		SessionTimeoutMs       string `yaml:"session.timeout.ms"`
-	} `yaml:"KafkaConsumer"`
+type Config struct {
+	Common         Common          `yaml:"Common"`
+	ProducerConfig producer.Config `yaml:"ProducerConfig"`
+	ConsumerConfig consumer.Config `yaml:"ConsumerConfig"`
 
 	DelayQueue struct {
 		BatchCommitSize     int              `yaml:"BatchCommitSize"`
@@ -57,64 +39,44 @@ type KafkaDelayQueueConfig struct {
 	} `yaml:"DelayQueue"`
 }
 
-func NewKafkaProducerConfig(c *KafkaDelayQueueConfig) *kafka.ConfigMap {
-	return &kafka.ConfigMap{
-		"acks":                          c.KafkaProducer.Acks,
-		"batch.size":                    c.KafkaProducer.BatchSize,
-		"compression.type":              c.KafkaProducer.CompressionType,
-		"delivery.timeout.ms":           c.KafkaProducer.DeliveryTimeoutMs,
-		"linger.ms":                     c.KafkaProducer.LingerMs,
-		"message.max.bytes":             c.KafkaProducer.MessageMaxBytes,
-		"retries":                       c.KafkaProducer.Retries,
-		"retry.backoff.ms":              c.KafkaProducer.RetryBackoffMs,
-		"sticky.partitioning.linger.ms": c.KafkaProducer.StickyPartitioningLingerMs,
-
-		"api.version.request": c.KafkaCommon.ApiVersionRequest,
-		"bootstrap.servers":   c.KafkaCommon.BootstrapServers,
-		"security.protocol":   c.KafkaCommon.SecurityProtocol,
-
-		// NOTE: uncomment the code below if `security.protocol != PLAINTEXT`
-		//"ssl.ca.location": c.KafkaCommon.SslCaLocation,
-		//"sasl.mechanisms": c.KafkaCommon.SaslMechanism,
-		//"sasl.username": c.KafkaCommon.SaslUsername,
-		//"sasl.password": c.KafkaCommon.SaslPassword,
+func LoadConfig() (*Config, error) {
+	yamlData, err := ioutil.ReadFile("./etc/delayqueue.yaml")
+	if err != nil {
+		return nil, err
 	}
+
+	cfg := new(Config)
+	err = yaml.Unmarshal(yamlData, cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	cfg.fillConsumerConfig()
+	cfg.fillProducerConfig()
+
+	return cfg, nil
 }
 
-func NewKafkaConsumerConfig(c *KafkaDelayQueueConfig) *kafka.ConfigMap {
-	return &kafka.ConfigMap{
-		"auto.offset.reset":         c.KafkaConsumer.AutoOffsetReset,
-		"enable.auto.commit":        c.KafkaConsumer.EnableAutoCommit,
-		"fetch.max.bytes":           c.KafkaConsumer.FetchMaxBytes,
-		"group.id":                  c.KafkaConsumer.GroupId,
-		"heartbeat.interval.ms":     c.KafkaConsumer.HeartbeatIntervalMs,
-		"max.partition.fetch.bytes": c.KafkaConsumer.MaxPartitionFetchBytes,
-		"max.poll.interval.ms":      c.KafkaConsumer.MaxPollIntervalMs,
-		"session.timeout.ms":        c.KafkaConsumer.SessionTimeoutMs,
-
-		"api.version.request": c.KafkaCommon.ApiVersionRequest,
-		"bootstrap.servers":   c.KafkaCommon.BootstrapServers,
-		"security.protocol":   c.KafkaCommon.SecurityProtocol,
-
-		// NOTE: uncomment the code below if `security.protocol != PLAINTEXT`
-		//"ssl.ca.location":     c.KafkaCommon.SslCaLocation,
-		//"sasl.mechanisms":     c.KafkaCommon.SaslMechanism,
-		//"sasl.username":       c.KafkaCommon.SaslUsername,
-		//"sasl.password":       c.KafkaCommon.SaslPassword,
-	}
+func (c *Config) fillConsumerConfig() {
+	c.ConsumerConfig.ApiVersionRequest = c.Common.ApiVersionRequest
+	c.ConsumerConfig.BootstrapServers = c.Common.BootstrapServers
+	c.ConsumerConfig.SecurityProtocol = c.Common.SecurityProtocol
+	c.ConsumerConfig.SslCaLocation = c.Common.SslCaLocation
+	c.ConsumerConfig.SaslMechanism = c.Common.SaslMechanism
+	c.ConsumerConfig.SaslUsername = c.Common.SaslUsername
+	c.ConsumerConfig.SaslPassword = c.Common.SaslPassword
 }
 
-func NewKafkaDelayQueueConfig() *KafkaDelayQueueConfig {
-	content, err := ioutil.ReadFile("./etc/delayqueue.yaml")
-	if err != nil {
-		panic(err)
-	}
+func (c *Config) fillProducerConfig() {
+	c.ProducerConfig.ApiVersionRequest = c.Common.ApiVersionRequest
+	c.ProducerConfig.BootstrapServers = c.Common.BootstrapServers
+	c.ProducerConfig.SecurityProtocol = c.Common.SecurityProtocol
+	c.ProducerConfig.SslCaLocation = c.Common.SslCaLocation
+	c.ProducerConfig.SaslMechanism = c.Common.SaslMechanism
+	c.ProducerConfig.SaslUsername = c.Common.SaslUsername
+	c.ProducerConfig.SaslPassword = c.Common.SaslPassword
 
-	c := &KafkaDelayQueueConfig{}
-	err = yaml.Unmarshal(content, c)
-	if err != nil {
-		panic(err)
-	}
-
-	return c
+	c.ProducerConfig.DelayDuration = make([]string, len(c.DelayQueue.DelayDuration))
+	copy(c.ProducerConfig.DelayDuration, c.DelayQueue.DelayDuration)
+	c.ProducerConfig.DelayTopicFormat = c.DelayQueue.DelayTopicFormat
 }
