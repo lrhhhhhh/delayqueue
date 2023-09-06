@@ -5,8 +5,9 @@
 - (3) 消费者到目标队列中拉取消息并消费
 
 ## 故障恢复
-由于消息全部都放到了kafka，依赖kafka做故障恢复。
-中间件delayqueue直接读一遍kafka，把未消费的消息读取到时间轮中，这个过程中如果遇到过期的消息，立即进行投递。
+由于消息全部都放到了kafka，依赖kafka做故障恢复。  
+宕机时，中间件 delayqueue 直接遍历一遍 kafka，把未消费的消息重新读取到时间轮中  
+在这个过程中如果遇到过期的消息，立即进行投递，未过期的消息则放入到时间轮中
 
 ## 优化 
 
@@ -22,12 +23,13 @@
 
 ## 运行example
 ```shell
+make up                             # 启动kafka
 go run example/delayqueue/main.go   # 先运行中间件delayqueue
 go run example/consumer/main.go     # 再运行生产者
 go run example/producer/main.go     # 最后运行消费者
 ```
 
 ## 性能：
-单机下replica
+单机下replica  
 partition数量、consumer group中consumer数量 
 
