@@ -29,6 +29,7 @@ ConsumerConfig:
   session.timeout.ms: 30000
 
 DelayQueue:
+  Clear: true                 # 运行前删除所有的topic和partition，仅用于测试
   Debug: false
   BatchCommitSize: 500        # 批量提交个数
   BatchCommitDuration: 1000   # 批量提交间隔， 单位毫秒

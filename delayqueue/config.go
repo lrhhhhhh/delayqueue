@@ -30,9 +30,12 @@ type Config struct {
 	ConsumerConfig consumer.Config `yaml:"ConsumerConfig"`
 
 	DelayQueue struct {
+		NumPartition        int              `yaml:"NumPartition"`
+		Replicas            int              `yaml:"Replicas"`
 		BatchCommitSize     int              `yaml:"BatchCommitSize"`
 		BatchCommitDuration int              `yaml:"BatchCommitDuration"`
 		Debug               bool             `yaml:"Debug"`
+		Clear               bool             `yaml:"Clear"`
 		DelayTopicFormat    string           `yaml:"DelayTopicFormat"`
 		DelayDuration       []string         `yaml:"DelayDuration"`
 		TopicPartition      []TopicPartition `yaml:"TopicPartition"`

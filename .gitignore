@@ -1,5 +1,4 @@
 .idea/
-kafka/kafka/config/
-kafka/kafka/data/
-kafka/zookeeper/data/
+deployments/kafka/
+deployments/zookeeper/
 

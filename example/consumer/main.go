@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"kafkadelayqueue/delayqueue"
+	"kafkadelayqueue/job"
+	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -18,16 +20,8 @@ func main() {
 	// use for pprof
 	go http.ListenAndServe(":18080", nil)
 
-	//n := 4
-	//tp := [][]delayqueue.TopicPartition{
-	//	[]delayqueue.TopicPartition{{"lrh", 0, 3}},
-	//	[]delayqueue.TopicPartition{{"lrh", 4, 7}},
-	//	[]delayqueue.TopicPartition{{"lrh", 8, 11}},
-	//	[]delayqueue.TopicPartition{{"lrh", 12, 15}},
-	//}
-
-	n := 128
-	topic := "lrh"
+	n := 4
+	topic := "delay-5s"
 	var tp [][]delayqueue.TopicPartition
 	for i := 0; i < n; i++ {
 		tp = append(tp, []delayqueue.TopicPartition{{topic, i, i}})
@@ -88,13 +82,14 @@ func main() {
 }
 
 func consume(topicPartition []delayqueue.TopicPartition, gid int, resultChan chan<- int) {
-	c := delayqueue.NewConfig()
-	consumerCfg := .NewKafkaConsumerConfig(c)
-	fmt.Println(consumerCfg)
-
-	GroupId := "real-consumer"
-	err := consumerCfg.SetKey("group.id", GroupId)
+	c, err := delayqueue.LoadConfig()
 	if err != nil {
+		panic(err)
+	}
+
+	consumerCfg := c.ConsumerConfig.ConfigMap()
+	GroupId := "real-consumer"
+	if err := consumerCfg.SetKey("group.id", GroupId); err != nil {
 		panic(err)
 	}
 
@@ -104,11 +99,12 @@ func consume(topicPartition []delayqueue.TopicPartition, gid int, resultChan cha
 	}
 
 	var t []kafka.TopicPartition
-	for _, tp := range topicPartition {
-		for i := tp.L; i <= tp.R; i++ {
+	for i := range topicPartition {
+		tp := topicPartition[i]
+		for partition := tp.L; partition <= tp.R; partition++ {
 			t = append(t, kafka.TopicPartition{
 				Topic:     &tp.Topic,
-				Partition: int32(i),
+				Partition: int32(partition),
 				Offset:    kafka.OffsetStored,
 			})
 		}
@@ -149,20 +145,20 @@ func consume(topicPartition []delayqueue.TopicPartition, gid int, resultChan cha
 			continue // NOTE:
 		}
 
-		var job delayqueue.Job
-		err = json.Unmarshal(msg.Value, &job)
+		var j job.Job
+		err = json.Unmarshal(msg.Value, &j)
 		if err != nil {
 			fmt.Println(err)
 			continue // NOTE:
 		}
 
-		resultChan <- job.Id
+		resultChan <- j.Id
 
-		timeDiff := time.Now().Unix() - job.ExecTime
+		timeDiff := time.Now().Unix() - j.ExecTime
 		if timeDiff >= 1 {
-			fmt.Printf(
+			log.Printf(
 				"ConsumerGroup: %v goroutine: %v job: %+v, TimeDiff: %d >= 0? offset: %v partition: %v\n",
-				GroupId, gid, job, time.Now().Unix()-job.ExecTime, msg.TopicPartition.Offset, msg.TopicPartition.Partition)
+				GroupId, gid, j, time.Now().Unix()-j.ExecTime, msg.TopicPartition.Offset, msg.TopicPartition.Partition)
 		}
 
 		Cnt += 1

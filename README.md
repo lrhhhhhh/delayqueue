@@ -33,3 +33,6 @@ go run example/producer/main.go     # 最后运行消费者
 单机下replica  
 partition数量、consumer group中consumer数量 
 
+
+## 设计
+一个delayqueue cover 多个topic，每个topic cover一个分区区间[l, r]

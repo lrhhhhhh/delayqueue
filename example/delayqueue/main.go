@@ -15,7 +15,7 @@ func main() {
 	// use for pprof
 	go http.ListenAndServe(":18081", nil)
 
-	n := 128
+	n := 8
 	topic := "delay-5s"
 	var tp [][]delayqueue.TopicPartition
 	for i := 0; i < n; i++ {
@@ -56,10 +56,10 @@ func runDelayQueue(topicPartition []delayqueue.TopicPartition) {
 	}
 	c.DelayQueue.TopicPartition = topicPartition
 
-	queue, err := delayqueue.New(c)
+	dq, err := delayqueue.New(c)
 	if err != nil {
 		panic(err)
 	}
 
-	queue.Run(c.DelayQueue.Debug)
+	dq.Run(c.DelayQueue.Debug)
 }

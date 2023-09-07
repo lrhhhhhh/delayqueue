@@ -20,7 +20,7 @@ func main() {
 	debug := true
 	queue.Run(debug)
 
-	n := 100000
+	n := 100
 	delay := 5 // delay 5 seconds
 	for jobId := 1; jobId <= n; jobId++ {
 		err := queue.AddJob(jobId, delay, "lrh", "")

@@ -8,6 +8,7 @@ import (
 	"kafkadelayqueue/consumer"
 	"kafkadelayqueue/job"
 	"kafkadelayqueue/producer"
+	"log"
 	"strconv"
 	"sync"
 	"time"
@@ -36,11 +37,12 @@ func New(c *Config) (*DelayQueue, error) {
 	}
 
 	var topicPartition []kafka.TopicPartition
-	for _, tp := range c.DelayQueue.TopicPartition {
-		for i := tp.L; i <= tp.R; i++ {
+	for i := range c.DelayQueue.TopicPartition {
+		tp := c.DelayQueue.TopicPartition[i]
+		for partition := tp.L; partition <= tp.R; partition++ {
 			topicPartition = append(topicPartition, kafka.TopicPartition{
 				Topic:     &tp.Topic,
-				Partition: int32(i),
+				Partition: int32(partition),
 				Offset:    kafka.OffsetStored,
 			})
 		}
@@ -77,7 +79,7 @@ func (k *DelayQueue) Run(debug bool) {
 				k.locker.Lock()
 				for tp := range k.pausedTopicPartition {
 					if err := k.consumer.Resume([]kafka.TopicPartition{tp}); err != nil {
-						fmt.Printf("consumer resume err: %+v, TopicPartition: (%+v)", err, tp)
+						log.Printf("consumer resume err: %+v, TopicPartition: (%+v)", err, tp)
 					} else {
 						delete(k.pausedTopicPartition, tp)
 					}
@@ -89,11 +91,11 @@ func (k *DelayQueue) Run(debug bool) {
 				res, err := k.consumer.Commit()
 				if err != nil {
 					if err.Error() != "Local: No offset stored" {
-						fmt.Println(err)
+						log.Println(err)
 					}
 				} else {
 					if debug {
-						fmt.Printf("consumer commit: %+v\n", res)
+						log.Printf("consumer commit: %+v\n", res)
 					}
 				}
 			}
@@ -104,7 +106,7 @@ func (k *DelayQueue) Run(debug bool) {
 		msg, err := k.consumer.ReadMessage(-1)
 		if err != nil {
 			if !errors.Is(err, kafka.NewError(kafka.ErrTimedOut, "", false)) {
-				fmt.Printf("Consumer ReadMessage Err:%v, msg(%v)\n", err, msg)
+				log.Printf("Consumer ReadMessage Err:%v, msg(%v)\n", err, msg)
 			}
 			continue
 		}
@@ -112,20 +114,20 @@ func (k *DelayQueue) Run(debug bool) {
 		var j job.Job
 		err = json.Unmarshal(msg.Value, &j)
 		if err != nil {
-			fmt.Printf("unmarshal Err:%v, msg(%v)\n", err, msg)
+			log.Printf("unmarshal Err:%v, msg(%v)\n", err, msg)
 			continue
 		}
 		if j.Topic == "" {
-			fmt.Printf("empty topic: job(%+v)\n", j)
+			log.Printf("empty topic: job(%+v)\n", j)
 			continue
 		}
 
 		if msg.Timestamp.After(time.Now()) {
 			if err = k.pause(msg.TopicPartition); err != nil {
-				fmt.Printf("Consumer PauseAndSeekTopicPartition Err:%v, jobId(%d), topicPartition(%+v)\n", err, j.Id, msg.TopicPartition)
+				log.Printf("Consumer PauseAndSeekTopicPartition Err:%v, jobId(%d), topicPartition(%+v)\n", err, j.Id, msg.TopicPartition)
 			}
 			if debug {
-				fmt.Printf(
+				log.Printf(
 					"job not ready: %+v, exec_time: %v, time_diff: %v > 0 ?\n",
 					j, time.Unix(j.ExecTime, 0), j.ExecTime-time.Now().Unix(),
 				)
@@ -133,7 +135,7 @@ func (k *DelayQueue) Run(debug bool) {
 		} else {
 			err = k.producer.Send(j.Topic, time.Now(), []byte(strconv.Itoa(j.Id)), msg.Value)
 			if err != nil {
-				fmt.Printf("job投递ready队列失败(%v), job(%+v)\n", err, j) // TODO:
+				log.Printf("job投递ready队列失败(%v), job(%+v)\n", err, j) // TODO:
 			} else {
 				cnt += 1
 				if cnt >= k.batchCommitSize {
@@ -143,7 +145,7 @@ func (k *DelayQueue) Run(debug bool) {
 			}
 
 			if debug {
-				fmt.Printf(
+				log.Printf(
 					"job has ready: %+v, exec_time: %v, time_diff: %v <= 0?\n",
 					j, time.Unix(j.ExecTime, 0), j.ExecTime-time.Now().Unix(),
 				)
