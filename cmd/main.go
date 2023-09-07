@@ -20,15 +20,15 @@ func InitKafka(c *delayqueue.Config) {
 	}
 
 	var topics []kafka.TopicSpecification
-	for _, duration := range c.DelayQueue.DelayDuration {
+	for _, duration := range c.DelayDuration {
 		topics = append(topics, kafka.TopicSpecification{
-			Topic:             fmt.Sprintf(c.DelayQueue.DelayTopicFormat, duration),
-			NumPartitions:     c.DelayQueue.NumPartition,
-			ReplicationFactor: c.DelayQueue.Replicas},
+			Topic:             fmt.Sprintf(c.DelayTopicFormat, duration),
+			NumPartitions:     c.NumPartition,
+			ReplicationFactor: c.Replicas},
 		)
 	}
 
-	if c.DelayQueue.Debug && c.DelayQueue.Clear {
+	if c.Debug && c.Clear {
 		//topic.Delete(admin, topics)
 		topic.Create(admin, topics)
 	}
@@ -40,6 +40,9 @@ func InitKafka(c *delayqueue.Config) {
 func main() {
 	flag.Parsed()
 
+	// pprof
+	go http.ListenAndServe(":18081", nil)
+
 	c, err := delayqueue.LoadConfig()
 	if err != nil {
 		panic(err)
@@ -47,14 +50,11 @@ func main() {
 
 	InitKafka(c)
 
-	// pprof
-	go http.ListenAndServe(":18081", nil)
-
 	dq, err := delayqueue.New(c)
 	if err != nil {
 		panic(err)
 	}
-	dq.Run(c.DelayQueue.Debug)
+	dq.Run(c.Debug)
 
 	exit := make(chan os.Signal, 1)
 	signal.Notify(exit, syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT)

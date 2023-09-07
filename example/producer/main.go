@@ -6,6 +6,7 @@ import (
 	"kafkadelayqueue/delayqueue"
 	"kafkadelayqueue/producer"
 	"kafkadelayqueue/utils/topic"
+	"time"
 )
 
 // 投递延迟消息到延迟队列
@@ -31,8 +32,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	debug := true
-	queue.Run(debug)
+	queue.Run(true)
 
 	n := 10000
 	delay := 5 // delay 5 seconds
@@ -43,4 +43,6 @@ func main() {
 		}
 	}
 	fmt.Println("produce finish")
+	fmt.Println("wait for result")
+	time.Sleep(time.Second * 30)
 }

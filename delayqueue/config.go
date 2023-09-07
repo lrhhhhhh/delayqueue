@@ -14,32 +14,19 @@ type TopicPartition struct {
 	R     int    `yaml:"r"`
 }
 
-type Common struct {
-	ApiVersionRequest bool   `yaml:"api.version.request"`
-	BootstrapServers  string `yaml:"bootstrap.servers"`
-	SecurityProtocol  string `yaml:"security.protocol"`
-	SslCaLocation     string `yaml:"ssl.ca.location"`
-	SaslMechanism     string `yaml:"sasl.mechanism"`
-	SaslUsername      string `yaml:"sasl.username"`
-	SaslPassword      string `yaml:"sasl.password"`
-}
-
 type Config struct {
-	Common         Common          `yaml:"Common"`
 	ProducerConfig producer.Config `yaml:"ProducerConfig"`
 	ConsumerConfig consumer.Config `yaml:"ConsumerConfig"`
 
-	DelayQueue struct {
-		NumPartition        int              `yaml:"NumPartition"`
-		Replicas            int              `yaml:"Replicas"`
-		BatchCommitSize     int              `yaml:"BatchCommitSize"`
-		BatchCommitDuration int              `yaml:"BatchCommitDuration"`
-		Debug               bool             `yaml:"Debug"`
-		Clear               bool             `yaml:"Clear"`
-		DelayTopicFormat    string           `yaml:"DelayTopicFormat"`
-		DelayDuration       []string         `yaml:"DelayDuration"`
-		TopicPartition      []TopicPartition `yaml:"TopicPartition"`
-	} `yaml:"DelayQueue"`
+	NumPartition        int              `yaml:"NumPartition"`
+	Replicas            int              `yaml:"Replicas"`
+	BatchCommitSize     int              `yaml:"BatchCommitSize"`
+	BatchCommitDuration int              `yaml:"BatchCommitDuration"`
+	Debug               bool             `yaml:"Debug"`
+	Clear               bool             `yaml:"Clear"` // delete topic before run
+	DelayTopicFormat    string           `yaml:"DelayTopicFormat"`
+	DelayDuration       []string         `yaml:"DelayDuration"`
+	TopicPartition      []TopicPartition `yaml:"TopicPartition"`
 }
 
 func LoadConfig() (*Config, error) {
@@ -54,32 +41,13 @@ func LoadConfig() (*Config, error) {
 		return nil, err
 	}
 
-	cfg.fillConsumerConfig()
 	cfg.fillProducerConfig()
 
 	return cfg, nil
 }
 
-func (c *Config) fillConsumerConfig() {
-	c.ConsumerConfig.ApiVersionRequest = c.Common.ApiVersionRequest
-	c.ConsumerConfig.BootstrapServers = c.Common.BootstrapServers
-	c.ConsumerConfig.SecurityProtocol = c.Common.SecurityProtocol
-	c.ConsumerConfig.SslCaLocation = c.Common.SslCaLocation
-	c.ConsumerConfig.SaslMechanism = c.Common.SaslMechanism
-	c.ConsumerConfig.SaslUsername = c.Common.SaslUsername
-	c.ConsumerConfig.SaslPassword = c.Common.SaslPassword
-}
-
 func (c *Config) fillProducerConfig() {
-	c.ProducerConfig.ApiVersionRequest = c.Common.ApiVersionRequest
-	c.ProducerConfig.BootstrapServers = c.Common.BootstrapServers
-	c.ProducerConfig.SecurityProtocol = c.Common.SecurityProtocol
-	c.ProducerConfig.SslCaLocation = c.Common.SslCaLocation
-	c.ProducerConfig.SaslMechanism = c.Common.SaslMechanism
-	c.ProducerConfig.SaslUsername = c.Common.SaslUsername
-	c.ProducerConfig.SaslPassword = c.Common.SaslPassword
-
-	c.ProducerConfig.DelayDuration = make([]string, len(c.DelayQueue.DelayDuration))
-	copy(c.ProducerConfig.DelayDuration, c.DelayQueue.DelayDuration)
-	c.ProducerConfig.DelayTopicFormat = c.DelayQueue.DelayTopicFormat
+	c.ProducerConfig.DelayDuration = make([]string, len(c.DelayDuration))
+	copy(c.ProducerConfig.DelayDuration, c.DelayDuration)
+	c.ProducerConfig.DelayTopicFormat = c.DelayTopicFormat
 }

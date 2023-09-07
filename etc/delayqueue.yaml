@@ -1,13 +1,11 @@
-Common:
+ProducerConfig:
   api.version.request: true
-  bootstrap.servers: "0.0.0.0:9092"        #
+  bootstrap.servers: "0.0.0.0:9092"
   security.protocol: "PLAINTEXT"
   ssl.ca.location: ""
   sasl.username: ""
   sasl.password: ""
   sasl.mechanisms: ""
-
-ProducerConfig:
   acks: "1"
   batch.size: 100000
   compression.type: lz4
@@ -19,6 +17,13 @@ ProducerConfig:
   sticky.partitioning.linger.ms: 1000
 
 ConsumerConfig:
+  api.version.request: true
+  bootstrap.servers: "0.0.0.0:9092"
+  security.protocol: "PLAINTEXT"
+  ssl.ca.location: ""
+  sasl.username: ""
+  sasl.password: ""
+  sasl.mechanisms: ""
   auto.offset.reset: "latest"
   enable.auto.commit: "false"
   fetch.max.bytes: 1024000
@@ -28,41 +33,26 @@ ConsumerConfig:
   max.poll.interval.ms: 120000
   session.timeout.ms: 30000
 
-DelayQueue:
-  Clear: true                 # 运行前删除所有的topic和partition，仅用于测试
-  Debug: true
-  Replicas: 1
-  NumPartition: 4
-  BatchCommitSize: 500        # 批量提交个数
-  BatchCommitDuration: 1000   # 批量提交间隔， 单位毫秒
-  TopicPartition:
-    - topic: delay-5s
-      l: 0
-      r: 7
-    - topic: delay-15m
-      l: 0
-      r: 7
-  DelayTopicFormat: "delay-%s"
-  DelayDuration:  # 支持的延迟间隔
-    - 5s
-#    - 10s
-    - 1m
-#    - 5m
-#    - 10m
-    - 15m
-#    - 20m
-#    - 25m
-#    - 30m
-#    - 1h
-#    - 2h
-#    - 3h
-#    - 6h
-#    - 12h
-#    - 1d
-#    - 2d
-#    - 3d
-#    - 7d
-#    - 14d
-#    - 28d
-#    - 30d
-#    - 31d
+# 运行前删除所有的topic和partition，仅用于测试
+Clear: true
+Debug: true
+
+BatchCommitSize: 500        # 批量提交个数
+BatchCommitDuration: 1000   # 批量提交间隔， 单位毫秒
+
+# 仅用于启动前创建kafka topic
+Replicas: 1
+NumPartition: 8
+DelayTopicFormat: "delay-%s"
+
+# 支持的延迟间隔
+DelayDuration:  [5s, 10s, 1m, 5m, 10m, 15m, 30m, 1h, 2h, 3h, 12h, 1d, 2d, 3d, 7d, 14d, 28d, 30d, 31d]
+
+# 当前实例监听的topic和partition:
+TopicPartition:
+  - topic: delay-5s
+    l: 0
+    r: 7
+  - topic: delay-15m
+    l: 0
+    r: 7

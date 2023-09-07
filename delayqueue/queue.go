@@ -17,8 +17,7 @@ import (
 type DelayQueue struct {
 	producer             *producer.Producer
 	consumer             *consumer.Consumer
-	batchCommitSize      int
-	batchCommitDuration  int
+	config               *Config
 	locker               *sync.Mutex // guardian for pauseTopicPartition
 	pausedTopicPartition map[kafka.TopicPartition]struct{}
 }
@@ -37,8 +36,8 @@ func New(c *Config) (*DelayQueue, error) {
 	}
 
 	var topicPartition []kafka.TopicPartition
-	for i := range c.DelayQueue.TopicPartition {
-		tp := c.DelayQueue.TopicPartition[i]
+	for i := range c.TopicPartition {
+		tp := c.TopicPartition[i]
 		for partition := tp.L; partition <= tp.R; partition++ {
 			topicPartition = append(topicPartition, kafka.TopicPartition{
 				Topic:     &tp.Topic,
@@ -54,50 +53,47 @@ func New(c *Config) (*DelayQueue, error) {
 		return nil, fmt.Errorf("consumer assign %+v fail: %w", topicPartition, err)
 	}
 
-	dqp.Run(c.DelayQueue.Debug)
+	dqp.Run(c.Debug)
 
 	return &DelayQueue{
 		producer:             dqp,
 		consumer:             dqc,
-		batchCommitSize:      c.DelayQueue.BatchCommitSize,
-		batchCommitDuration:  c.DelayQueue.BatchCommitDuration,
+		config:               c,
 		locker:               new(sync.Mutex),
 		pausedTopicPartition: make(map[kafka.TopicPartition]struct{}),
 	}, nil
 }
 
 // Run 监听延迟队列，到期投递到真正的队列，未到期则暂停消费延迟队列，ticker到期后恢复消费
-func (k *DelayQueue) Run(debug bool) {
+func (dq *DelayQueue) Run(debug bool) {
 	cnt := 0 // todo: mod or uint
 	commitSignal := make(chan struct{})
+
+	log.Println("DelayQueue is running...")
 
 	// 检查delayqueue所负责的所有元组(topic,partition)，提交
 	go func() {
 		resumeTicker := time.Tick(50 * time.Millisecond)
-		commitTicker := time.Tick(time.Duration(k.batchCommitDuration) * time.Millisecond)
+		commitTicker := time.Tick(time.Duration(dq.config.BatchCommitDuration) * time.Millisecond)
 		for {
 			select {
 			case <-resumeTicker:
-				k.locker.Lock()
-				for tp := range k.pausedTopicPartition {
-					if err := k.consumer.Resume([]kafka.TopicPartition{tp}); err != nil {
+				dq.locker.Lock()
+				for tp := range dq.pausedTopicPartition {
+					if err := dq.consumer.Resume([]kafka.TopicPartition{tp}); err != nil {
 						log.Printf("consumer resume err: %+v, TopicPartition: (%+v)", err, tp)
 					} else {
-						delete(k.pausedTopicPartition, tp)
+						delete(dq.pausedTopicPartition, tp)
 					}
 				}
-				k.locker.Unlock()
+				dq.locker.Unlock()
 
 			case <-commitSignal:
 			case <-commitTicker:
-				res, err := k.consumer.Commit()
+				_, err := dq.consumer.Commit()
 				if err != nil {
 					if err.Error() != "Local: No offset stored" {
 						log.Println(err)
-					}
-				} else {
-					if debug {
-						log.Printf("consumer commit: %+v\n", res)
 					}
 				}
 			}
@@ -105,7 +101,7 @@ func (k *DelayQueue) Run(debug bool) {
 	}()
 
 	for {
-		msg, err := k.consumer.ReadMessage(-1)
+		msg, err := dq.consumer.ReadMessage(-1)
 		if err != nil {
 			if !errors.Is(err, kafka.NewError(kafka.ErrTimedOut, "", false)) {
 				log.Printf("Consumer ReadMessage Err:%v, msg(%v)\n", err, msg)
@@ -125,7 +121,7 @@ func (k *DelayQueue) Run(debug bool) {
 		}
 
 		if msg.Timestamp.After(time.Now()) {
-			if err = k.pause(msg.TopicPartition); err != nil {
+			if err = dq.pause(msg.TopicPartition); err != nil {
 				log.Printf("Consumer PauseAndSeekTopicPartition Err:%v, jobId(%d), topicPartition(%+v)\n", err, j.Id, msg.TopicPartition)
 			}
 			if debug {
@@ -135,12 +131,12 @@ func (k *DelayQueue) Run(debug bool) {
 				)
 			}
 		} else {
-			err = k.producer.Send(j.Topic, time.Now(), []byte(strconv.Itoa(j.Id)), msg.Value)
+			err = dq.producer.Send(j.Topic, time.Now(), []byte(strconv.Itoa(j.Id)), msg.Value)
 			if err != nil {
 				log.Printf("job投递ready队列失败(%v), job(%+v)\n", err, j) // TODO:
 			} else {
 				cnt += 1
-				if cnt >= k.batchCommitSize {
+				if cnt >= dq.config.BatchCommitSize {
 					cnt = 0
 					commitSignal <- struct{}{}
 				}
@@ -157,22 +153,22 @@ func (k *DelayQueue) Run(debug bool) {
 }
 
 // pause 暂停消费并重置offset
-func (k *DelayQueue) pause(tp kafka.TopicPartition) error {
-	err := k.consumer.Pause([]kafka.TopicPartition{tp})
+func (dq *DelayQueue) pause(tp kafka.TopicPartition) error {
+	err := dq.consumer.Pause([]kafka.TopicPartition{tp})
 	if err != nil {
 		return err
 	}
 
-	k.locker.Lock()
-	defer k.locker.Unlock()
-	k.pausedTopicPartition[tp] = struct{}{}
+	dq.locker.Lock()
+	defer dq.locker.Unlock()
+	dq.pausedTopicPartition[tp] = struct{}{}
 
-	return k.consumer.Seek(tp, 50)
+	return dq.consumer.Seek(tp, 50)
 }
 
-func (k *DelayQueue) Close() {
-	k.producer.Close()
-	_ = k.consumer.Close()
+func (dq *DelayQueue) Close() {
+	dq.producer.Close()
+	dq.consumer.Close()
 }
 
 func (dq *DelayQueue) RecoverTimeWheel() {

@@ -12,7 +12,7 @@ import (
 
 type Producer struct {
 	*kafka.Producer
-	c *Config
+	config *Config
 }
 
 func New(c *Config) (*Producer, error) {
@@ -23,13 +23,14 @@ func New(c *Config) (*Producer, error) {
 
 	return &Producer{
 		Producer: producer,
-		c:        c,
+		config:   c,
 	}, nil
 }
 
-func (k *Producer) Run(debug bool) {
+func (p *Producer) Run(debug bool) {
+	// 监听结果
 	go func() {
-		for e := range k.Events() {
+		for e := range p.Events() {
 			switch ev := e.(type) {
 			case *kafka.Message:
 				m := ev
@@ -51,7 +52,7 @@ func (k *Producer) Run(debug bool) {
 }
 
 // Send a message, partition selection using the hash of Key
-func (k *Producer) Send(topic string, timestamp time.Time, key, value []byte) (err error) {
+func (p *Producer) Send(topic string, timestamp time.Time, key, value []byte) (err error) {
 	msg := &kafka.Message{
 		Timestamp: timestamp,
 		TopicPartition: kafka.TopicPartition{
@@ -62,18 +63,19 @@ func (k *Producer) Send(topic string, timestamp time.Time, key, value []byte) (e
 		Value: value,
 	}
 
-	err = k.Producer.Produce(msg, nil)
+	err = p.Producer.Produce(msg, nil)
 	if err != nil {
 		return err
 	}
 
 	// uncomment the code below, block until a resp was received
-	//event := <-k.Producer.Events()
+	// 如果运行了Run()，那么这里会被阻塞
+	//event := <-k.Events()
 	//fmt.Printf("%+v\n", event)
 	return nil
 }
 
-func (k *Producer) AddJob(jobId, delay int, topic, body string) error {
+func (p *Producer) AddJob(jobId, delay int, topic, body string) error {
 	j := job.Job{
 		Topic:    topic,
 		Id:       jobId,
@@ -92,12 +94,12 @@ func (k *Producer) AddJob(jobId, delay int, topic, body string) error {
 		return err
 	}
 
-	delayTopic, err := k.selectDelayTopic(int64(delay))
+	delayTopic, err := p.selectDelayTopic(int64(delay))
 	if err != nil {
 		return err
 	}
 
-	return k.Send(
+	return p.Send(
 		delayTopic,
 		time.Unix(j.ExecTime, 0),
 		[]byte(strconv.Itoa(jobId)),
@@ -106,15 +108,15 @@ func (k *Producer) AddJob(jobId, delay int, topic, body string) error {
 }
 
 // selectTopic() 为 producer 选择一个大于等于delay的topic, 单位是秒
-func (k *Producer) selectDelayTopic(delay int64) (string, error) {
-	i := sort.Search(len(k.c.DelayDuration), func(i int) bool {
-		d, _ := time.ParseDuration(k.c.DelayDuration[i])
+func (p *Producer) selectDelayTopic(delay int64) (string, error) {
+	i := sort.Search(len(p.config.DelayDuration), func(i int) bool {
+		d, _ := time.ParseDuration(p.config.DelayDuration[i])
 		return d >= time.Duration(delay)*time.Second
 	})
 
-	if i == len(k.c.DelayDuration) {
-		return "", fmt.Errorf("期望的延迟间隔: %v 大于所有预设的延迟间隔 %v", delay, k.c.DelayDuration)
+	if i == len(p.config.DelayDuration) {
+		return "", fmt.Errorf("期望的延迟间隔: %v 大于所有预设的延迟间隔 %v", delay, p.config.DelayDuration)
 	}
 
-	return fmt.Sprintf(k.c.DelayTopicFormat, k.c.DelayDuration[i]), nil
+	return fmt.Sprintf(p.config.DelayTopicFormat, p.config.DelayDuration[i]), nil
 }

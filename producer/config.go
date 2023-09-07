@@ -13,13 +13,13 @@ type Config struct {
 	RetryBackoffMs             string `yaml:"retry.backoff.ms"`
 	StickyPartitioningLingerMs string `yaml:"sticky.partitioning.linger.ms"`
 
-	ApiVersionRequest bool   `yaml:"api.version.request,omitempty"`
-	BootstrapServers  string `yaml:"bootstrap.servers,omitempty"`
-	SecurityProtocol  string `yaml:"security.protocol,omitempty"`
-	SslCaLocation     string `yaml:"ssl.ca.location,omitempty"`
-	SaslMechanism     string `yaml:"sasl.mechanism,omitempty"`
-	SaslUsername      string `yaml:"sasl.username,omitempty"`
-	SaslPassword      string `yaml:"sasl.password,omitempty"`
+	ApiVersionRequest bool   `yaml:"api.version.request"`
+	BootstrapServers  string `yaml:"bootstrap.servers"`
+	SecurityProtocol  string `yaml:"security.protocol"`
+	SslCaLocation     string `yaml:"ssl.ca.location"`
+	SaslMechanism     string `yaml:"sasl.mechanism"`
+	SaslUsername      string `yaml:"sasl.username"`
+	SaslPassword      string `yaml:"sasl.password"`
 
 	DelayTopicFormat string   `yaml:"DelayTopicFormat"`
 	DelayDuration    []string `yaml:"DelayDuration"`

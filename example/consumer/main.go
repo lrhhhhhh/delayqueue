@@ -20,6 +20,11 @@ import (
 func main() {
 	go http.ListenAndServe(":18080", nil)
 
+	c, err := delayqueue.LoadConfig()
+	if err != nil {
+		panic(err)
+	}
+
 	n := 4
 	topic := "real-topic"
 	var tp [][]delayqueue.TopicPartition
@@ -27,45 +32,38 @@ func main() {
 		tp = append(tp, []delayqueue.TopicPartition{{topic, i, i}})
 	}
 
-	var jobs []int
-	resultChan := make(chan int, 10000)
+	// example/producer/main.go 中生产 10000个延迟消息，ID范围为[0, 10000]
+	m := 10000
+	resultChan := make(chan int, m)
 
-	// 用n个消费者消费不同的(topic,partition)组合
+	// 4个消费者，每个负责一个partition
 	for i := 0; i < n; i++ {
-		go consume(tp[i], i, resultChan)
+		tp := []kafka.TopicPartition{
+			{
+				Topic:     &topic,
+				Partition: int32(i),
+				Offset:    kafka.OffsetStored,
+			},
+		}
+
+		c.ConsumerConfig.GroupId = "real-consumer"
+		consumerCfg := c.ConsumerConfig.ConfigMap()
+
+		consumer, err := kafka.NewConsumer(consumerCfg)
+		if err != nil {
+			panic(err)
+		}
+
+		err = consumer.Assign(tp)
+		if err != nil {
+			panic(err)
+		}
+
+		go consume(consumer, resultChan)
 	}
 
-	go func() {
-		d := 30 * time.Second
-		ticker := time.NewTicker(d)
-		for {
-			select {
-			case id := <-resultChan:
-				jobs = append(jobs, id)
-				ticker.Reset(d)
-			case <-ticker.C:
-				isValid := true
-				mp := make(map[int]int)
-				for i := 0; i < len(jobs); i++ {
-					mp[jobs[i]] += 1
-				}
-				for i := 1; i <= 100000; i++ {
-					v, ok := mp[i]
-					if !ok || v != 1 {
-						isValid = false
-						break
-					}
-				}
-				if isValid {
-					fmt.Println("check!")
-				} else {
-					fmt.Printf("fail, %d diff\n", 100000-len(jobs))
-				}
-				jobs = jobs[0:0]
-				ticker.Stop()
-			}
-		}
-	}()
+	// 检查延迟消息是否全部被处理
+	go check(resultChan, 1, m, 15*time.Second)
 
 	exit := make(chan os.Signal, 1)
 	signal.Notify(exit, syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT)
@@ -75,45 +73,13 @@ func main() {
 			if s == syscall.SIGHUP {
 				break
 			}
-			fmt.Println("Server Signal Done")
+			log.Println("Server Signal Done")
 			return
 		}
 	}
 }
 
-func consume(topicPartition []delayqueue.TopicPartition, gid int, resultChan chan<- int) {
-	c, err := delayqueue.LoadConfig()
-	if err != nil {
-		panic(err)
-	}
-
-	consumerCfg := c.ConsumerConfig.ConfigMap()
-	GroupId := "real-consumer"
-	if err := consumerCfg.SetKey("group.id", GroupId); err != nil {
-		panic(err)
-	}
-
-	consumer, err := kafka.NewConsumer(consumerCfg)
-	if err != nil {
-		panic(err)
-	}
-
-	var t []kafka.TopicPartition
-	for i := range topicPartition {
-		tp := topicPartition[i]
-		for partition := tp.L; partition <= tp.R; partition++ {
-			t = append(t, kafka.TopicPartition{
-				Topic:     &tp.Topic,
-				Partition: int32(partition),
-				Offset:    kafka.OffsetStored,
-			})
-		}
-	}
-	err = consumer.Assign(t)
-	if err != nil {
-		panic(err)
-	}
-
+func consume(consumer *kafka.Consumer, resultChan chan<- int) {
 	ticker := time.Tick(time.Second)
 	ch := make(chan struct{})
 	// commit async
@@ -148,7 +114,7 @@ func consume(topicPartition []delayqueue.TopicPartition, gid int, resultChan cha
 		var j job.Job
 		err = json.Unmarshal(msg.Value, &j)
 		if err != nil {
-			fmt.Println(err)
+			log.Println(err)
 			continue // NOTE:
 		}
 
@@ -157,8 +123,8 @@ func consume(topicPartition []delayqueue.TopicPartition, gid int, resultChan cha
 		timeDiff := time.Now().Unix() - j.ExecTime
 		if timeDiff >= 1 {
 			log.Printf(
-				"ConsumerGroup: %v goroutine: %v job: %+v, TimeDiff: %d >= 0? offset: %v partition: %v\n",
-				GroupId, gid, j, time.Now().Unix()-j.ExecTime, msg.TopicPartition.Offset, msg.TopicPartition.Partition)
+				"job: %+v, TimeDiff: %d >= 0? offset: %v partition: %v\n",
+				j, time.Now().Unix()-j.ExecTime, msg.TopicPartition.Offset, msg.TopicPartition.Partition)
 		}
 
 		Cnt += 1
@@ -170,6 +136,34 @@ func consume(topicPartition []delayqueue.TopicPartition, gid int, resultChan cha
 		_, err = consumer.CommitMessage(msg)
 		if err != nil {
 			fmt.Println(err)
+		}
+	}
+}
+
+// 等待waitTime时间间隔后检查ID在[FromId, ToId]范围内的所有延迟消息是否被正常消费
+func check(resultChan chan int, FromId, ToId int, waitTime time.Duration) {
+	mp := make(map[int]int)
+	ticker := time.NewTicker(waitTime)
+	for {
+		select {
+		case id := <-resultChan:
+			mp[id] += 1
+			ticker.Reset(waitTime)
+		case <-ticker.C:
+			isValid := true
+			for i := FromId; i <= ToId; i++ {
+				if v, ok := mp[i]; !ok || v != 1 {
+					isValid = false
+					break
+				}
+			}
+			if isValid {
+				log.Println("recv all message, done!")
+			} else {
+				fmt.Printf("fail, %d diff\n", ToId-FromId+1-len(mp))
+			}
+			mp = make(map[int]int)
+			ticker.Stop()
 		}
 	}
 }
