@@ -19,16 +19,18 @@ func InitKafka(c *delayqueue.Config) {
 		panic(err)
 	}
 
-	var topics []string
+	var topics []kafka.TopicSpecification
 	for _, duration := range c.DelayQueue.DelayDuration {
-		topics = append(topics, fmt.Sprintf(c.DelayQueue.DelayTopicFormat, duration))
+		topics = append(topics, kafka.TopicSpecification{
+			Topic:             fmt.Sprintf(c.DelayQueue.DelayTopicFormat, duration),
+			NumPartitions:     c.DelayQueue.NumPartition,
+			ReplicationFactor: c.DelayQueue.Replicas},
+		)
 	}
-
-	topics = append(topics, "order-cancel", "stock-deduct")
 
 	if c.DelayQueue.Debug && c.DelayQueue.Clear {
 		//topic.Delete(admin, topics)
-		topic.Create(admin, topics, c.DelayQueue.NumPartition, c.DelayQueue.Replicas)
+		topic.Create(admin, topics)
 	}
 
 	time.Sleep(time.Second * 3)

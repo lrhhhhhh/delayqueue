@@ -50,6 +50,7 @@ func New(c *Config) (*DelayQueue, error) {
 
 	err = dqc.Assign(topicPartition)
 	if err != nil {
+		log.Println(err)
 		return nil, fmt.Errorf("consumer assign %+v fail: %w", topicPartition, err)
 	}
 
@@ -67,9 +68,10 @@ func New(c *Config) (*DelayQueue, error) {
 
 // Run 监听延迟队列，到期投递到真正的队列，未到期则暂停消费延迟队列，ticker到期后恢复消费
 func (k *DelayQueue) Run(debug bool) {
-	cnt := 0
+	cnt := 0 // todo: mod or uint
 	commitSignal := make(chan struct{})
 
+	// 检查delayqueue所负责的所有元组(topic,partition)，提交
 	go func() {
 		resumeTicker := time.Tick(50 * time.Millisecond)
 		commitTicker := time.Tick(time.Duration(k.batchCommitDuration) * time.Millisecond)
@@ -171,4 +173,15 @@ func (k *DelayQueue) pause(tp kafka.TopicPartition) error {
 func (k *DelayQueue) Close() {
 	k.producer.Close()
 	_ = k.consumer.Close()
+}
+
+func (dq *DelayQueue) RecoverTimeWheel() {
+
+}
+
+// Restart 故障或停机后重启
+// 需要重读kafka中所有未消费的消息到时间轮子中
+func (dq *DelayQueue) Restart() {
+	dq.RecoverTimeWheel()
+	dq.Run(false)
 }

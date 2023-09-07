@@ -1,6 +1,6 @@
 Common:
   api.version.request: true
-  bootstrap.servers: "172.28.0.3:9092"
+  bootstrap.servers: "0.0.0.0:9092"        #
   security.protocol: "PLAINTEXT"
   ssl.ca.location: ""
   sasl.username: ""
@@ -49,7 +49,7 @@ DelayQueue:
     - 1m
 #    - 5m
 #    - 10m
-#    - 15m
+    - 15m
 #    - 20m
 #    - 25m
 #    - 30m

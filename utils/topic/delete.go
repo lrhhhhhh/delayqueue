@@ -7,8 +7,12 @@ import (
 )
 
 // Delete 使用 admin 删除 kafka topic 和 partition
-func Delete(admin *kafka.AdminClient, topics []string) {
-	results, err := admin.DeleteTopics(context.Background(), topics)
+func Delete(admin *kafka.AdminClient, topics []kafka.TopicSpecification) {
+	topicNames := make([]string, len(topics))
+	for i, x := range topics {
+		topicNames[i] = x.Topic
+	}
+	results, err := admin.DeleteTopics(context.Background(), topicNames)
 	if err != nil {
 		panic(err)
 	}

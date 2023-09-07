@@ -16,12 +16,12 @@ import (
 	_ "net/http/pprof"
 )
 
+// 用来消费真实的topic信息
 func main() {
-	// use for pprof
 	go http.ListenAndServe(":18080", nil)
 
 	n := 4
-	topic := "delay-5s"
+	topic := "real-topic"
 	var tp [][]delayqueue.TopicPartition
 	for i := 0; i < n; i++ {
 		tp = append(tp, []delayqueue.TopicPartition{{topic, i, i}})
@@ -30,11 +30,11 @@ func main() {
 	var jobs []int
 	resultChan := make(chan int, 10000)
 
+	// 用n个消费者消费不同的(topic,partition)组合
 	for i := 0; i < n; i++ {
 		go consume(tp[i], i, resultChan)
 	}
 
-	// check 100000 message
 	go func() {
 		d := 30 * time.Second
 		ticker := time.NewTicker(d)
@@ -167,9 +167,9 @@ func consume(topicPartition []delayqueue.TopicPartition, gid int, resultChan cha
 			ch <- struct{}{}
 		}
 
-		//_, err = consumer.CommitMessage(msg)
-		//if err != nil {
-		//	fmt.Println(err)
-		//}
+		_, err = consumer.CommitMessage(msg)
+		if err != nil {
+			fmt.Println(err)
+		}
 	}
 }

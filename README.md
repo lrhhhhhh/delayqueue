@@ -24,7 +24,7 @@
 ## 运行example
 ```shell
 make up                             # 启动kafka
-go run example/delayqueue/main.go   # 先运行中间件delayqueue
+go run cmd/main.go                  # 先运行中间件delayqueue
 go run example/consumer/main.go     # 再运行生产者
 go run example/producer/main.go     # 最后运行消费者
 ```

@@ -4,6 +4,7 @@ import (
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 )
 
+//
 type Consumer struct {
 	*kafka.Consumer
 	c *Config
