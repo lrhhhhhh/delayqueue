@@ -1,11 +1,11 @@
 package producer
 
 import (
+	"delayqueue/job"
+	"delayqueue/log"
 	"encoding/json"
 	"fmt"
 	"github.com/confluentinc/confluent-kafka-go/kafka"
-	"kafkadelayqueue/job"
-	"kafkadelayqueue/log"
 	"sort"
 	"strconv"
 	"time"

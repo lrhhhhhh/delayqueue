@@ -2,8 +2,8 @@ package topic
 
 import (
 	"context"
+	"delayqueue/log"
 	"github.com/confluentinc/confluent-kafka-go/kafka"
-	"kafkadelayqueue/log"
 )
 
 // Delete 使用 admin 删除 kafka topic 和 partition

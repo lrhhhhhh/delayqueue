@@ -1,4 +1,4 @@
-module kafkadelayqueue
+module delayqueue
 
 go 1.17
 

@@ -1,11 +1,11 @@
 package main
 
 import (
+	"delayqueue/delayqueue"
+	"delayqueue/log"
+	"delayqueue/producer"
+	"delayqueue/utils/topic"
 	"github.com/confluentinc/confluent-kafka-go/kafka"
-	"kafkadelayqueue/delayqueue"
-	"kafkadelayqueue/log"
-	"kafkadelayqueue/producer"
-	"kafkadelayqueue/utils/topic"
 	"time"
 )
 

@@ -1,11 +1,11 @@
 package main
 
 import (
+	"delayqueue/delayqueue"
+	"delayqueue/utils/topic"
 	"flag"
 	"fmt"
 	"github.com/confluentinc/confluent-kafka-go/kafka"
-	"kafkadelayqueue/delayqueue"
-	"kafkadelayqueue/utils/topic"
 	"net/http"
 	"os"
 	"os/signal"

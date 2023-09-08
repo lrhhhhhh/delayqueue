@@ -1,12 +1,12 @@
 package main
 
 import (
+	"delayqueue/delayqueue"
+	"delayqueue/job"
+	"delayqueue/log"
 	"encoding/json"
 	"fmt"
 	"github.com/confluentinc/confluent-kafka-go/kafka"
-	"kafkadelayqueue/delayqueue"
-	"kafkadelayqueue/job"
-	"kafkadelayqueue/log"
 	"net/http"
 	"os"
 	"os/signal"

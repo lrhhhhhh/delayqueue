@@ -1,14 +1,14 @@
 package delayqueue
 
 import (
+	"delayqueue/consumer"
+	"delayqueue/job"
+	"delayqueue/log"
+	"delayqueue/producer"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/confluentinc/confluent-kafka-go/kafka"
-	"kafkadelayqueue/consumer"
-	"kafkadelayqueue/job"
-	"kafkadelayqueue/log"
-	"kafkadelayqueue/producer"
 	"strconv"
 	"sync"
 	"time"

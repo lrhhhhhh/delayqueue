@@ -1,10 +1,10 @@
 package delayqueue
 
 import (
+	"delayqueue/consumer"
+	"delayqueue/producer"
 	"gopkg.in/yaml.v3"
 	"io/ioutil"
-	"kafkadelayqueue/consumer"
-	"kafkadelayqueue/producer"
 )
 
 // TopicPartition represent a topic from partition l to r
