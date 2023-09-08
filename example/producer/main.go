@@ -1,9 +1,9 @@
 package main
 
 import (
-	"fmt"
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"kafkadelayqueue/delayqueue"
+	"kafkadelayqueue/log"
 	"kafkadelayqueue/producer"
 	"kafkadelayqueue/utils/topic"
 	"time"
@@ -42,7 +42,6 @@ func main() {
 			panic(err)
 		}
 	}
-	fmt.Println("produce finish")
-	fmt.Println("wait for result")
+	log.Debug("produce finish")
 	time.Sleep(time.Second * 30)
 }

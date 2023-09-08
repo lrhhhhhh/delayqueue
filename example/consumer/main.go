@@ -6,7 +6,7 @@ import (
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"kafkadelayqueue/delayqueue"
 	"kafkadelayqueue/job"
-	"log"
+	"kafkadelayqueue/log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -73,7 +73,7 @@ func main() {
 			if s == syscall.SIGHUP {
 				break
 			}
-			log.Println("Server Signal Done")
+			log.Info("Server Signal Done")
 			return
 		}
 	}
@@ -91,7 +91,7 @@ func consume(consumer *kafka.Consumer, resultChan chan<- int) {
 				res, err := consumer.Commit()
 				if err != nil {
 					if err.Error() != "Local: No offset stored" {
-						fmt.Println(err)
+						log.Error(err.Error())
 					}
 				} else {
 					_ = res
@@ -114,7 +114,7 @@ func consume(consumer *kafka.Consumer, resultChan chan<- int) {
 		var j job.Job
 		err = json.Unmarshal(msg.Value, &j)
 		if err != nil {
-			log.Println(err)
+			log.Error(err.Error())
 			continue // NOTE:
 		}
 
@@ -122,8 +122,7 @@ func consume(consumer *kafka.Consumer, resultChan chan<- int) {
 
 		timeDiff := time.Now().Unix() - j.ExecTime
 		if timeDiff >= 1 {
-			log.Printf(
-				"job: %+v, TimeDiff: %d >= 0? offset: %v partition: %v\n",
+			log.Infof("job: %+v, TimeDiff: %d >= 0? offset: %v partition: %v\n",
 				j, time.Now().Unix()-j.ExecTime, msg.TopicPartition.Offset, msg.TopicPartition.Partition)
 		}
 
@@ -135,7 +134,7 @@ func consume(consumer *kafka.Consumer, resultChan chan<- int) {
 
 		_, err = consumer.CommitMessage(msg)
 		if err != nil {
-			fmt.Println(err)
+			log.Error(err.Error())
 		}
 	}
 }
@@ -158,9 +157,9 @@ func check(resultChan chan int, FromId, ToId int, waitTime time.Duration) {
 				}
 			}
 			if isValid {
-				log.Println("recv all message, done!")
+				log.Info("recv all message, done!")
 			} else {
-				fmt.Printf("fail, %d diff\n", ToId-FromId+1-len(mp))
+				log.Infof("fail, %d diff\n", ToId-FromId+1-len(mp))
 			}
 			mp = make(map[int]int)
 			ticker.Stop()

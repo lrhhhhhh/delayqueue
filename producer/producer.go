@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"kafkadelayqueue/job"
+	"kafkadelayqueue/log"
 	"sort"
 	"strconv"
 	"time"
@@ -35,17 +36,15 @@ func (p *Producer) Run(debug bool) {
 			case *kafka.Message:
 				m := ev
 				if m.TopicPartition.Error != nil {
-					fmt.Printf("Delivery failed: %v, message: %+v\n", m.TopicPartition.Error, m)
+					log.Errorf("Delivery failed: %v, message: %+v\n", m.TopicPartition.Error, m)
 				} else {
-					if debug {
-						fmt.Printf("Delivered message to topic %s [%d] at offset %v\n",
-							*m.TopicPartition.Topic, m.TopicPartition.Partition, m.TopicPartition.Offset)
-					}
+					log.Debugf("Delivered message to topic %s [%d] at offset %v\n",
+						*m.TopicPartition.Topic, m.TopicPartition.Partition, m.TopicPartition.Offset)
 				}
 			case kafka.Error:
-				fmt.Printf("Error: %v\n", ev)
+				log.Errorf("Error: %v\n", ev)
 			default:
-				fmt.Printf("Ignored event: %s\n", ev)
+				log.Errorf("Ignored event: %s\n", ev)
 			}
 		}
 	}()

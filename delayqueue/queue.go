@@ -7,8 +7,8 @@ import (
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"kafkadelayqueue/consumer"
 	"kafkadelayqueue/job"
+	"kafkadelayqueue/log"
 	"kafkadelayqueue/producer"
-	"log"
 	"strconv"
 	"sync"
 	"time"
@@ -49,8 +49,8 @@ func New(c *Config) (*DelayQueue, error) {
 
 	err = dqc.Assign(topicPartition)
 	if err != nil {
-		log.Println(err)
-		return nil, fmt.Errorf("consumer assign %+v fail: %w", topicPartition, err)
+		log.Errorf("consumer assign %+v fail: %w", topicPartition, err)
+		return nil, err
 	}
 
 	dqp.Run(c.Debug)
@@ -69,7 +69,7 @@ func (dq *DelayQueue) Run(debug bool) {
 	cnt := 0 // todo: mod or uint
 	commitSignal := make(chan struct{})
 
-	log.Println("DelayQueue is running...")
+	log.Info("DelayQueue is running...")
 
 	// 检查delayqueue所负责的所有元组(topic,partition)，提交
 	go func() {
@@ -81,7 +81,7 @@ func (dq *DelayQueue) Run(debug bool) {
 				dq.locker.Lock()
 				for tp := range dq.pausedTopicPartition {
 					if err := dq.consumer.Resume([]kafka.TopicPartition{tp}); err != nil {
-						log.Printf("consumer resume err: %+v, TopicPartition: (%+v)", err, tp)
+						log.Errorf("consumer resume err: %+v, TopicPartition: (%+v)", err, tp)
 					} else {
 						delete(dq.pausedTopicPartition, tp)
 					}
@@ -93,7 +93,7 @@ func (dq *DelayQueue) Run(debug bool) {
 				_, err := dq.consumer.Commit()
 				if err != nil {
 					if err.Error() != "Local: No offset stored" {
-						log.Println(err)
+						log.Error(err.Error())
 					}
 				}
 			}
@@ -104,7 +104,7 @@ func (dq *DelayQueue) Run(debug bool) {
 		msg, err := dq.consumer.ReadMessage(-1)
 		if err != nil {
 			if !errors.Is(err, kafka.NewError(kafka.ErrTimedOut, "", false)) {
-				log.Printf("Consumer ReadMessage Err:%v, msg(%v)\n", err, msg)
+				log.Errorf("Consumer ReadMessage Err:%v, msg(%v)\n", err, msg)
 			}
 			continue
 		}
@@ -112,28 +112,24 @@ func (dq *DelayQueue) Run(debug bool) {
 		var j job.Job
 		err = json.Unmarshal(msg.Value, &j)
 		if err != nil {
-			log.Printf("unmarshal Err:%v, msg(%v)\n", err, msg)
+			log.Errorf("unmarshal Err:%v, msg(%v)\n", err, msg)
 			continue
 		}
 		if j.Topic == "" {
-			log.Printf("empty topic: job(%+v)\n", j)
+			log.Errorf("empty topic: job(%+v)\n", j)
 			continue
 		}
 
 		if msg.Timestamp.After(time.Now()) {
 			if err = dq.pause(msg.TopicPartition); err != nil {
-				log.Printf("Consumer PauseAndSeekTopicPartition Err:%v, jobId(%d), topicPartition(%+v)\n", err, j.Id, msg.TopicPartition)
+				log.Errorf("Consumer PauseAndSeekTopicPartition Err:%v, jobId(%d), topicPartition(%+v)\n", err, j.Id, msg.TopicPartition)
 			}
-			if debug {
-				log.Printf(
-					"job not ready: %+v, exec_time: %v, time_diff: %v > 0 ?\n",
-					j, time.Unix(j.ExecTime, 0), j.ExecTime-time.Now().Unix(),
-				)
-			}
+			log.Debugf("job not ready: %+v, exec_time: %v, time_diff: %v > 0 ?\n",
+				j, time.Unix(j.ExecTime, 0), j.ExecTime-time.Now().Unix())
 		} else {
 			err = dq.producer.Send(j.Topic, time.Now(), []byte(strconv.Itoa(j.Id)), msg.Value)
 			if err != nil {
-				log.Printf("job投递ready队列失败(%v), job(%+v)\n", err, j) // TODO:
+				log.Errorf("job投递ready队列失败(%v), job(%+v)\n", err, j) // TODO:
 			} else {
 				cnt += 1
 				if cnt >= dq.config.BatchCommitSize {
@@ -142,12 +138,9 @@ func (dq *DelayQueue) Run(debug bool) {
 				}
 			}
 
-			if debug {
-				log.Printf(
-					"job has ready: %+v, exec_time: %v, time_diff: %v <= 0?\n",
-					j, time.Unix(j.ExecTime, 0), j.ExecTime-time.Now().Unix(),
-				)
-			}
+			log.Debugf("job has ready: %+v, exec_time: %v, time_diff: %v <= 0?\n",
+				j, time.Unix(j.ExecTime, 0), j.ExecTime-time.Now().Unix(),
+			)
 		}
 	}
 }

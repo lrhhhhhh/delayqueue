@@ -3,7 +3,7 @@ package topic
 import (
 	"context"
 	"github.com/confluentinc/confluent-kafka-go/kafka"
-	"log"
+	"kafkadelayqueue/log"
 )
 
 // Delete 使用 admin 删除 kafka topic 和 partition
@@ -17,7 +17,7 @@ func Delete(admin *kafka.AdminClient, topics []kafka.TopicSpecification) {
 		panic(err)
 	}
 	for _, result := range results {
-		log.Printf("%s\n", result)
+		log.Warnf("%s\n", result)
 	}
-	log.Println("delete topics done")
+	log.Info("delete topics done")
 }

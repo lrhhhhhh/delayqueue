@@ -3,7 +3,7 @@ package topic
 import (
 	"context"
 	"github.com/confluentinc/confluent-kafka-go/kafka"
-	"log"
+	"kafkadelayqueue/log"
 	"time"
 )
 
@@ -14,11 +14,11 @@ func Create(admin *kafka.AdminClient, topics []kafka.TopicSpecification) {
 		topics,
 		kafka.SetAdminOperationTimeout(time.Millisecond*200))
 	if err != nil {
-		log.Printf("Failed to create topic: %v\n", err)
+		log.Errorf("Failed to create topic: %v\n", err)
 	}
 
 	for _, result := range results {
-		log.Printf("%s\n", result)
+		log.Warnf("%s\n", result)
 	}
-	log.Println("create topics done")
+	log.Info("create topics done")
 }
