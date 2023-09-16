@@ -42,7 +42,7 @@ func main() {
 	flag.Parsed()
 
 	// pprof
-	go http.ListenAndServe(":18081", nil)
+	go http.ListenAndServe(":8081", nil)
 
 	c, err := delayqueue.LoadConfig()
 	if err != nil {

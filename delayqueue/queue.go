@@ -18,7 +18,7 @@ import (
 
 type DelayQueue struct {
 	producer       *producer.Producer
-	consumer       *consumer.LoHiConsumer
+	consumer       *consumer.Consumer
 	tw             *timewheel.TimeWheel
 	config         *Config
 	locker         *sync.Mutex // guardian for pauseTopicPartition
@@ -34,7 +34,7 @@ func New(c *Config) (*DelayQueue, error) {
 	}
 
 	// DelayQueueConsumer -> dqc
-	dqc, err := consumer.NewLoHiConsumer(c.ConsumerConfig)
+	dqc, err := consumer.New(c.ConsumerConfig)
 	if err != nil {
 		log.Error(err)
 		return nil, fmt.Errorf("NewKafkaConsumer error: %w", err)
