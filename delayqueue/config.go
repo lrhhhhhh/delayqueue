@@ -9,24 +9,25 @@ import (
 
 // TopicPartition represent a topic from partition l to r
 type TopicPartition struct {
-	Topic string `yaml:"topic"`
-	L     int    `yaml:"l"`
-	R     int    `yaml:"r"`
+	Topic     string `yaml:"topic"`
+	Partition int64  `yaml:"partition"`
 }
 
 type Config struct {
 	ProducerConfig producer.Config `yaml:"ProducerConfig"`
 	ConsumerConfig consumer.Config `yaml:"ConsumerConfig"`
 
-	NumPartition        int              `yaml:"NumPartition"`
-	Replicas            int              `yaml:"Replicas"`
-	BatchCommitSize     int              `yaml:"BatchCommitSize"`
-	BatchCommitDuration int              `yaml:"BatchCommitDuration"`
-	Debug               bool             `yaml:"Debug"`
-	Clear               bool             `yaml:"Clear"` // delete topic before run
-	DelayTopicFormat    string           `yaml:"DelayTopicFormat"`
-	DelayDuration       []string         `yaml:"DelayDuration"`
-	TopicPartition      []TopicPartition `yaml:"TopicPartition"`
+	NumPartition        int            `yaml:"NumPartition"`
+	Replicas            int            `yaml:"Replicas"`
+	BatchCommitSize     int            `yaml:"BatchCommitSize"`
+	BatchCommitDuration int            `yaml:"BatchCommitDuration"`
+	Debug               bool           `yaml:"Debug"`
+	Clear               bool           `yaml:"Clear"` // delete topic before run
+	DelayTopicFormat    string         `yaml:"DelayTopicFormat"`
+	DelayDuration       []string       `yaml:"DelayDuration"`
+	TopicPartition      TopicPartition `yaml:"TopicPartition"`
+	MaxTimeWheelSize    int            `yaml:"MaxTimeWheelSize"`
+	Step                int            `yaml:"Step"`
 }
 
 func LoadConfig() (*Config, error) {

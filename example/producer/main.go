@@ -2,6 +2,7 @@ package main
 
 import (
 	"delayqueue/delayqueue"
+	"delayqueue/job"
 	"delayqueue/log"
 	"delayqueue/producer"
 	"delayqueue/utils/topic"
@@ -16,16 +17,19 @@ func main() {
 		panic(err)
 	}
 
-	realTopic := "real-topic"
-	topics := []kafka.TopicSpecification{{
-		Topic:             realTopic,
-		NumPartitions:     4,
-		ReplicationFactor: 1}}
+	targetTopic := "real-topic"
+	numPartition := 1
+	replicas := 1
+
 	admin, err := kafka.NewAdminClient(c.ProducerConfig.ConfigMap())
 	if err != nil {
 		panic(err)
 	}
-	topic.Create(admin, topics)
+	topic.Create(admin, []kafka.TopicSpecification{{
+		Topic:             targetTopic,
+		NumPartitions:     numPartition,
+		ReplicationFactor: replicas,
+	}})
 	admin.Close()
 
 	queue, err := producer.New(&c.ProducerConfig)
@@ -34,11 +38,16 @@ func main() {
 	}
 	queue.Run(true)
 
-	n := 10000
-	delay := 5 // delay 5 seconds
+	n := 100
+	delayMs := 5000 // delay 5 seconds = 5000ms
 	for jobId := 1; jobId <= n; jobId++ {
-		err := queue.AddJob(jobId, delay, realTopic, "")
-		if err != nil {
+		if err := queue.AddJob(&job.Job{
+			Id:         jobId,
+			Topic:      targetTopic,
+			Body:       "",
+			DelayMs:    int64(delayMs),
+			ExecTimeMs: int64(delayMs) + time.Now().UnixMilli(),
+		}); err != nil {
 			panic(err)
 		}
 	}

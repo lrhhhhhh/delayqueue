@@ -5,65 +5,42 @@ import (
 	"delayqueue/job"
 	"delayqueue/log"
 	"encoding/json"
-	"fmt"
 	"github.com/confluentinc/confluent-kafka-go/kafka"
-	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
-
-	_ "net/http/pprof"
 )
 
 // 用来消费真实的topic信息
 func main() {
-	go http.ListenAndServe(":18080", nil)
-
 	c, err := delayqueue.LoadConfig()
 	if err != nil {
 		panic(err)
 	}
 
-	n := 4
+	numConsumer := 1
 	topic := "real-topic"
-	var tp [][]delayqueue.TopicPartition
-	for i := 0; i < n; i++ {
-		tp = append(tp, []delayqueue.TopicPartition{{topic, i, i}})
-	}
 
 	// example/producer/main.go 中生产 10000个延迟消息，ID范围为[0, 10000]
-	m := 10000
-	resultChan := make(chan int, m)
+	FromId := 1
+	ToId := 10000
+	resultChan := make(chan int, 100)
 
-	// 4个消费者，每个负责一个partition
-	for i := 0; i < n; i++ {
-		tp := []kafka.TopicPartition{
-			{
-				Topic:     &topic,
-				Partition: int32(i),
-				Offset:    kafka.OffsetStored,
-			},
+	for i := 0; i < numConsumer; i++ {
+		tp := kafka.TopicPartition{
+			Topic:     &topic,
+			Partition: int32(i),
+			Offset:    kafka.OffsetStored,
 		}
 
 		c.ConsumerConfig.GroupId = "real-consumer"
-		consumerCfg := c.ConsumerConfig.ConfigMap()
 
-		consumer, err := kafka.NewConsumer(consumerCfg)
-		if err != nil {
-			panic(err)
-		}
-
-		err = consumer.Assign(tp)
-		if err != nil {
-			panic(err)
-		}
-
-		go consume(consumer, resultChan)
+		go consume(c.ConsumerConfig.ConfigMap(), tp, resultChan)
 	}
 
 	// 检查延迟消息是否全部被处理
-	go check(resultChan, 1, m, 15*time.Second)
+	go check(resultChan, FromId, ToId, 15*time.Second)
 
 	exit := make(chan os.Signal, 1)
 	signal.Notify(exit, syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT)
@@ -73,69 +50,44 @@ func main() {
 			if s == syscall.SIGHUP {
 				break
 			}
-			log.Info("Server Signal Done")
 			return
 		}
 	}
 }
 
-func consume(consumer *kafka.Consumer, resultChan chan<- int) {
-	ticker := time.Tick(time.Second)
-	ch := make(chan struct{})
-	// commit async
-	go func() {
-		for {
-			select {
-			case <-ch:
-			case <-ticker:
-				res, err := consumer.Commit()
-				if err != nil {
-					if err.Error() != "Local: No offset stored" {
-						log.Error(err.Error())
-					}
-				} else {
-					_ = res
-					//fmt.Printf("consumer commit: %+v\n", res)
-				}
-			}
-		}
-	}()
+func consume(c *kafka.ConfigMap, tp kafka.TopicPartition, resultChan chan<- int) {
+	consumer, err := kafka.NewConsumer(c)
+	if err != nil {
+		panic(err)
+	}
 
-	Cnt := 0
-	batchCommitSize := 1000
+	if err = consumer.Assign([]kafka.TopicPartition{tp}); err != nil {
+		panic(err)
+	}
 
 	for {
 		msg, err := consumer.ReadMessage(-1)
 		if err != nil {
-			fmt.Printf("Consumer ReadMessage Err:%v, msg(%v)\n", err, msg)
-			continue // NOTE:
+			log.Error(err)
+			continue
 		}
 
 		var j job.Job
-		err = json.Unmarshal(msg.Value, &j)
-		if err != nil {
-			log.Error(err.Error())
-			continue // NOTE:
+		if err = json.Unmarshal(msg.Value, &j); err != nil {
+			log.Error(err)
+			continue
+		}
+
+		timeDiff := time.Now().UnixMilli() - j.ExecTimeMs
+		if timeDiff >= 1 {
+			log.Infof("job: %+v, TimeDiff: %d >= 0?, tp=%v", j, timeDiff, msg.TopicPartition)
+		}
+
+		if _, err = consumer.CommitMessage(msg); err != nil {
+			log.Error(err)
 		}
 
 		resultChan <- j.Id
-
-		timeDiff := time.Now().Unix() - j.ExecTime
-		if timeDiff >= 1 {
-			log.Infof("job: %+v, TimeDiff: %d >= 0? offset: %v partition: %v\n",
-				j, time.Now().Unix()-j.ExecTime, msg.TopicPartition.Offset, msg.TopicPartition.Partition)
-		}
-
-		Cnt += 1
-		if Cnt >= batchCommitSize {
-			Cnt = 0
-			ch <- struct{}{}
-		}
-
-		_, err = consumer.CommitMessage(msg)
-		if err != nil {
-			log.Error(err.Error())
-		}
 	}
 }
 

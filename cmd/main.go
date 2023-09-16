@@ -2,6 +2,7 @@ package main
 
 import (
 	"delayqueue/delayqueue"
+	"delayqueue/log"
 	"delayqueue/utils/topic"
 	"flag"
 	"fmt"
@@ -48,13 +49,18 @@ func main() {
 		panic(err)
 	}
 
+	if c.Debug {
+		log.Init("DEBUG")
+	}
+
 	InitKafka(c)
 
 	dq, err := delayqueue.New(c)
 	if err != nil {
 		panic(err)
 	}
-	dq.Run(c.Debug)
+
+	dq.Run()
 
 	exit := make(chan os.Signal, 1)
 	signal.Notify(exit, syscall.SIGHUP, syscall.SIGQUIT, syscall.SIGTERM, syscall.SIGINT)

@@ -12,6 +12,10 @@ var defaultLogger *zap.Logger
 var defaultLevel string = "INFO"
 var defaultEncoding string = "json"
 
+func Init(level string) {
+	defaultLevel = level
+}
+
 func getLogger() *zap.Logger {
 	if defaultLogger == nil {
 		logger, err := newConsoleLogger(defaultLevel, defaultEncoding)
@@ -59,8 +63,8 @@ func Warn(msg string, fields ...zap.Field) {
 	getLogger().Warn(msg, fields...)
 }
 
-func Error(msg string, fields ...zap.Field) {
-	getLogger().Error(msg, fields...)
+func Error(err error, fields ...zap.Field) {
+	getLogger().Error(err.Error(), fields...)
 }
 
 func Panic(msg string, fields ...zap.Field) {

@@ -36,3 +36,15 @@ partition数量、consumer group中consumer数量
 
 ## 设计
 一个delayqueue cover 多个topic，每个topic cover一个分区区间[l, r]
+
+
+## 谈谈可靠性 
+从延迟队列中取出放入时间轮中等待，这里存在可靠性问题。 
+从时间轮中取出放入到目标队列，这里存在可靠性问题。
+
+保证至少一次投递 
+
+
+需要保证消息幂等性。  
+
+
