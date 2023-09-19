@@ -17,6 +17,8 @@ func main() {
 		panic(err)
 	}
 
+	log.Init("DEBUG")
+
 	targetTopic := "real-topic"
 	numPartition := 1
 	replicas := 1
@@ -52,5 +54,5 @@ func main() {
 		}
 	}
 	log.Debug("produce finish")
-	time.Sleep(time.Second * 30)
+	time.Sleep(time.Second * 60)
 }

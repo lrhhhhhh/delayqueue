@@ -34,6 +34,11 @@ ConsumerConfig:
   max.poll.interval.ms: 120000
   session.timeout.ms: 30000
 
+  # 当前实例监听的topic和partition:
+  TopicPartition:
+    topic: "delay-5s"
+    partition: 0
+
 # 运行前删除所有的topic和partition，仅用于测试
 Clear: true
 Debug: true
@@ -49,10 +54,6 @@ DelayTopicFormat: "delay-%s"
 # 支持的延迟间隔
 DelayDuration:  [5s, 10s, 1m, 5m, 10m, 15m, 30m, 1h, 2h, 3h, 12h, 1d, 2d, 3d, 7d, 14d, 28d, 30d, 31d]
 
-# 当前实例监听的topic和partition:
-TopicPartition:
-  topic: "delay-5s"
-  partition: 0
 
-Step: 50  # 时间轮每步步长，单位为毫秒
-MaxTimeWheelSize: 10000 # 时间轮最大容量
+Step: 500  # 时间轮每步步长，单位为毫秒
+MaxTimeWheelSize: 1000 # 时间轮最大容量

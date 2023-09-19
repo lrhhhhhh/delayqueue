@@ -2,6 +2,11 @@ package consumer
 
 import "github.com/confluentinc/confluent-kafka-go/kafka"
 
+type TopicPartition struct {
+	Topic     string `yaml:"topic"`
+	Partition int64  `yaml:"partition"`
+}
+
 type Config struct {
 	AutoOffsetReset        string `yaml:"auto.offset.reset"`
 	EnableAutoCommit       string `yaml:"enable.auto.commit"`
@@ -19,6 +24,8 @@ type Config struct {
 	SaslMechanism     string `yaml:"sasl.mechanism"`
 	SaslUsername      string `yaml:"sasl.username"`
 	SaslPassword      string `yaml:"sasl.password"`
+
+	TopicPartition TopicPartition `yaml:"TopicPartition"`
 }
 
 func (c *Config) ConfigMap() *kafka.ConfigMap {

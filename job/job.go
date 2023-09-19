@@ -23,3 +23,8 @@ func (j *Job) Validate() error {
 	}
 	return nil
 }
+
+func (j *Job) String() string {
+	return fmt.Sprintf("<Id=%d,Topic=%s,DelayMs=%v,ExecTimeMs=%v,Body=%s>",
+		j.Id, j.Topic, time.Duration(j.DelayMs*int64(time.Millisecond)), time.UnixMilli(j.ExecTimeMs).UTC(), j.Body)
+}
